@@ -1,7 +1,7 @@
 {
   "$schema": "https://www.raycast.com/schemas/extension.json",
-  "name": "openai-gpt3-translator",
-  "title": "OpenAI GPT3 Translator",
+  "name": "openai-gpt3-translate",
+  "title": "OpenAI GPT3 Translate",
   "description": "",
   "icon": "command-icon.png",
   "author": "pianweiwan",

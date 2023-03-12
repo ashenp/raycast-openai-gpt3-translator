@@ -1,8 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Form, ActionPanel, Action, showToast, LocalStorage } from '@raycast/api';
+import { Form, ActionPanel, Action, showToast, LocalStorage, Toast, getPreferenceValues } from '@raycast/api';
 import fetch from 'node-fetch';
 import React from 'react';
-import { pseudoRandomBytes } from 'crypto';
+
+
+
+interface Preferences {
+  apiKey: string;
+}
+
 
 type Values = {
   textarea: string;
@@ -16,6 +22,7 @@ type Message = {
 type ChatRequest = {
   model: string;
   messages: Message[];
+  stream: false;
 };
 
 
@@ -38,7 +45,37 @@ type ChatCompletion = {
   };
 };
 
+type ModelResponse = {
+  error: {
+    code: string
+  }
+};
+
+
 const model: string = 'gpt-3.5-turbo';
+// gpt-3.5-turbo
+const domain: string = 'https://api.openai.com';
+const chatUrl: string = domain + '/v1/chat/completions';
+const modelUrl: string = domain + '/v1/models';
+
+
+
+function toastContent(title: string, content: string) {
+  const options: Toast.Options = {
+    style: Toast.Style.Failure,
+    title: title,
+    message: content,
+    primaryAction: {
+      title: "Do something",
+      onAction: (toast) => {
+        toast.hide();
+      },
+    },
+  };
+  showToast(options)
+}
+
+
 
 function createChatRequest(content: string): ChatRequest {
   const realString = "翻译以下内容：\n" + content;
@@ -49,13 +86,14 @@ function createChatRequest(content: string): ChatRequest {
   const chatRequest: ChatRequest = {
     model: model,
     messages: [message],
+    stream: false,
   };
   return chatRequest;
 }
 
 async function sendRequest(content: string): Promise<string> {
-  const apiKey = await LocalStorage.getItem<string>('api-key');
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const apiKey =  getApiKey();
+  const response = await fetch(chatUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -63,52 +101,47 @@ async function sendRequest(content: string): Promise<string> {
     },
     body: JSON.stringify(createChatRequest(content)),
   });
-  
-  // console.log('apiKey:', apiKey);
+
   const responseBody = await response.text();
   const chatCompletion: ChatCompletion = JSON.parse(responseBody) as ChatCompletion;
   return chatCompletion.choices[0].message.content;
 }
 
-function useApiKey(): string {
-  const [apiKey, setApiKey] = useState<string>('');
+function getApiKey(): string {
+  const preferences = getPreferenceValues<Preferences>();
+  return preferences.apiKey;
+}
+
+async function checkApiKey(apiKey: string): Promise<boolean> {
+  const response = await fetch(modelUrl, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + apiKey || '',
+    },
+  });
+  const responseText = await response.text();
+  const modelResponse = JSON.parse(await responseText) as ModelResponse;
+  const errorCode = modelResponse?.error?.code; // access the 'code' field of the 'error' object
+  return (errorCode != 'invalid_api_key');
+}
+
+
+function MainPage() {
+  const configuredApiKey = getApiKey();
+  const [apiKeyChecked, setApiKeyChecked] = useState<boolean>(false);
   useEffect(() => {
-    async function fetchApiKey() {
-      const storedApiKey = await LocalStorage.getItem<string>('api-key');
-      if (storedApiKey) {
-        setApiKey(storedApiKey);
+    async function check() {
+      const checked = await checkApiKey(configuredApiKey);
+      setApiKeyChecked(checked);
+      if (!checked) {
+        toastContent("Invalid APIKey", "Please Check Your APIKey In Extension Configuration Page");
       }
     }
-
-    fetchApiKey();
   }, []);
 
-  return apiKey;
-}
-
-function ConfigPage() {
-  function handleSubmit(values: { textfield: string }) {
-    LocalStorage.setItem('api-key', values.textfield);
-    window.location.reload();
-  }
-
-  return (
-    <Form
-      actions={
-        <ActionPanel>
-          <Action.SubmitForm onSubmit={handleSubmit} />
-        </ActionPanel>
-      }
-    >
-      <Form.TextField id="textfield" title="Api-Key" placeholder="Enter your Api-Key" />
-    </Form>
-  );
-}
-
-function UsePage() {
   const [output, setOutput] = React.useState<string>('');
   async function handleSubmit(values: Values) {
-    console.log(values);
     const res = await sendRequest(values.textarea);
     setOutput(res);
   }
@@ -124,25 +157,10 @@ function UsePage() {
       <Form.TextArea id="textarea" title="Input" placeholder="Enter multi-line text" />
       <Form.TextArea id="targetarea" title="Output" value={output} onChange={setOutput} placeholder="Enter multi-line text" />
       <Form.Separator />
-      <Form.Dropdown id="dropdown" title="Dropdown">
-        <Form.Dropdown.Item value="zh-en" title="中->英" />
-        <Form.Dropdown.Item value="en-zh" title="英->中" />
-      </Form.Dropdown>
     </Form>
   );
 }
 
-function RefreshPage() {
-  const apiKey = useApiKey();
-
-  if (!apiKey) {
-    return <ConfigPage />;
-  }
-
-  console.log('test');
-  return <UsePage />;
-}
-
 export default function Command() {
-  return <RefreshPage />;
+  return <MainPage />;
 }

@@ -1,1 +1,1 @@
-# OpenAI GPT3 Translate
+# OpenAI GPT3 Translator Plugin

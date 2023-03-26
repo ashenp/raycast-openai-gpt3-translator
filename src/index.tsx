@@ -60,9 +60,9 @@ const modelUrl: string = domain + '/v1/models';
 
 
 
-function toastContent(title: string, content: string) {
+function toastContent(title: string, content: string, style: Toast.Style) {
   const options: Toast.Options = {
-    style: Toast.Style.Failure,
+    style: style,
     title: title,
     message: content,
     primaryAction: {
@@ -130,19 +130,26 @@ async function checkApiKey(apiKey: string): Promise<boolean> {
 function MainPage() {
   const configuredApiKey = getApiKey();
   const [apiKeyChecked, setApiKeyChecked] = useState<boolean>(false);
+
   useEffect(() => {
     async function check() {
+      toastContent("Checking", "APIKey Checking", Toast.Style.Animated);
       const checked = await checkApiKey(configuredApiKey);
       setApiKeyChecked(checked);
       if (!checked) {
-        toastContent("Invalid APIKey", "Please Check Your APIKey In Extension Configuration Page");
+        toastContent("Invalid APIKey", "Please Check Your APIKey In Extension Configuration Page", Toast.Style.Failure);
+      } else {
+        toastContent("APIKey Checked", "", Toast.Style.Success);
       }
     }
+    check();
   }, []);
 
   const [output, setOutput] = React.useState<string>('');
   async function handleSubmit(values: Values) {
+    toastContent("Asking", "", Toast.Style.Animated)
     const res = await sendRequest(values.textarea);
+    toastContent("Answered", "", Toast.Style.Success);
     setOutput(res);
   }
 
@@ -154,7 +161,7 @@ function MainPage() {
         </ActionPanel>
       }
     >
-      <Form.TextArea id="textarea" title="Input" placeholder="Enter multi-line text" />
+      <Form.TextArea id="textarea" title="Input" placeholder="Enter multi-line text"  />
       <Form.TextArea id="targetarea" title="Output" value={output} onChange={setOutput} placeholder="Enter multi-line text" />
       <Form.Separator />
     </Form>

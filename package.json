@@ -10,8 +10,8 @@
     {
       "name": "index",
       "title": "Trans",
-      "subtitle": "OpenAI GPT3 Translate",
-      "description": "OpenAI GPT3 Translate",
+      "subtitle": "OpenAI GPT3 Translator",
+      "description": "OpenAI GPT3 Translator",
       "mode": "view"
     }
   ],

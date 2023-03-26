@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Form, ActionPanel, Action, showToast, LocalStorage, Toast, getPreferenceValues } from '@raycast/api';
+import { Form, ActionPanel, Action, showToast, LocalStorage, Toast, getPreferenceValues, Icon, List, useNavigation } from '@raycast/api';
 import fetch from 'node-fetch';
 import React from 'react';
+import QueneCache from './queue_cache';
 
 
+var cache: QueneCache = new QueneCache(100, "quque_cache");
 
 interface Preferences {
   apiKey: string;
@@ -13,6 +15,7 @@ interface Preferences {
 type Values = {
   textarea: string;
 };
+
 
 type Message = {
   role: string;
@@ -59,7 +62,6 @@ const chatUrl: string = domain + '/v1/chat/completions';
 const modelUrl: string = domain + '/v1/models';
 
 
-
 function toastContent(title: string, content: string, style: Toast.Style) {
   const options: Toast.Options = {
     style: style,
@@ -74,7 +76,6 @@ function toastContent(title: string, content: string, style: Toast.Style) {
   };
   showToast(options)
 }
-
 
 
 function createChatRequest(content: string): ChatRequest {
@@ -92,7 +93,7 @@ function createChatRequest(content: string): ChatRequest {
 }
 
 async function sendRequest(content: string): Promise<string> {
-  const apiKey =  getApiKey();
+  const apiKey = getApiKey();
   const response = await fetch(chatUrl, {
     method: 'POST',
     headers: {
@@ -126,6 +127,34 @@ async function checkApiKey(apiKey: string): Promise<boolean> {
   return (errorCode != 'invalid_api_key');
 }
 
+function HistoryList() {
+  const { pop } = useNavigation();
+  const items = cache.toArray().map((item) => {
+    return (
+      <List.Item
+        key={item.key}
+        title={item.key}
+        detail={
+          <List.Item.Detail markdown={item.value} />}
+      />
+    );
+  });
+  return (
+    <List isShowingDetail>
+      {items}
+    </List>
+  );
+}
+
+function HistoryAction() {
+  return (
+    <Action.Push
+      icon={Icon.List}
+      title="History List"
+      target={<HistoryList />}
+    />
+  );
+}
 
 function MainPage() {
   const configuredApiKey = getApiKey();
@@ -146,22 +175,28 @@ function MainPage() {
   }, []);
 
   const [output, setOutput] = React.useState<string>('');
+
   async function handleSubmit(values: Values) {
     toastContent("Asking", "", Toast.Style.Animated)
     const res = await sendRequest(values.textarea);
+    cache.push(values.textarea.trimStart(), res);
     toastContent("Answered", "", Toast.Style.Success);
+    cache.save();
     setOutput(res);
+    console.log(cache);
   }
+
 
   return (
     <Form
       actions={
         <ActionPanel>
-          <Action.SubmitForm onSubmit={handleSubmit} />
+          <Action.SubmitForm onSubmit={handleSubmit} icon={Icon.ArrowRight}/>
+          <HistoryAction />
         </ActionPanel>
       }
     >
-      <Form.TextArea id="textarea" title="Input" placeholder="Enter multi-line text"  />
+      <Form.TextArea id="textarea" title="Input" placeholder="Enter multi-line text" />
       <Form.TextArea id="targetarea" title="Output" value={output} onChange={setOutput} placeholder="Enter multi-line text" />
       <Form.Separator />
     </Form>
@@ -171,3 +206,5 @@ function MainPage() {
 export default function Command() {
   return <MainPage />;
 }
+
+
